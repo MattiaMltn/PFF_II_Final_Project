@@ -15,11 +15,6 @@ LLM spiega i risultati in linguaggio naturale.
 - [Nome] — Volatility surface
 - [Nome] — Frontend Streamlit e LLM
 
-## Installazione
-git clone https://github.com/username/PFF_II_Final_Project
-cd PFF_II_Final_Project
-pip install -r requirements.txt
-cp .env.example .env
 
 ## Avvio
 streamlit run frontend/app.py
