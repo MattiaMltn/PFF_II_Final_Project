@@ -26,3 +26,5 @@ backend/llm/       → Claude API
 frontend/app.py    → Dashboard Streamlit
 tests/             → Test unitari
 docs/              → Documentazione LaTeX
+
+ciao mattia
