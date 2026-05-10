@@ -3,3 +3,4 @@ __pycache__/
 *.pyc
 .env
 options_data.db
+test_manual

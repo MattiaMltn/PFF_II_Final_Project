@@ -103,10 +103,31 @@ def save_closing_snapshot(ticker: str, option_type: str) -> int:
     return len(snapshot_rows)
 
 
+def save_all_tickers() -> dict[str, int]:
+    """Run save_closing_snapshot for all supported tickers and both option types.
+
+    Returns:
+        Dict mapping ticker to total rows saved (call + put combined).
+    """
+    from backend.data.config import SUPPORTED_TICKERS
+
+    results = {}
+    for ticker in SUPPORTED_TICKERS:
+        total = 0
+        for option_type in ("call", "put"):
+            total += save_closing_snapshot(ticker, option_type)
+        results[ticker] = total
+        logger.info("Ticker %s: %d rows saved.", ticker, total)
+    return results
+
+
 if __name__ == "__main__":
     import sys
 
     logging.basicConfig(level=logging.INFO)
-    _ticker = sys.argv[1] if len(sys.argv) > 1 else "AAPL"
-    for _otype in ("call", "put"):
-        save_closing_snapshot(_ticker, _otype)
+    if len(sys.argv) > 1:
+        _ticker = sys.argv[1]
+        for _otype in ("call", "put"):
+            save_closing_snapshot(_ticker, _otype)
+    else:
+        save_all_tickers()
