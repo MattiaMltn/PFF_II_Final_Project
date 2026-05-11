@@ -61,9 +61,7 @@ set for the Pricing Engine. The output of this module is the direct input of the
 Pricing Engine: `get_pricing_inputs()` returns exactly `S, K, T, r, sigma, bid, ask`
 with no transformation required on the consumer side.
  
-In parallel, `save_closing.py` runs at end of day to snapshot implied volatility
-across all available strikes and expirations. These snapshots accumulate in the
-database and feed the Volatility Surface module.
+In parallel, save_closing.py runs at end of day to snapshot implied volatility across all supported tickers, strikes and expirations. These snapshots accumulate in the database and feed the Volatility Surface module. The daily execution is intended to be scheduled on a VPS via cron job. 
  
 **Public interface** — other modules import only from `backend/data/market_data.py`:
  
@@ -80,15 +78,17 @@ For offline development without live API calls:
 from backend.data.mock_data import MOCK_CHAIN, MOCK_PRICING_INPUTS
 ```
  
-**Files to build:**
+**Files**
  
 ```
 backend/data/
+├── config.py        → list of supported tickers
 ├── database.py      → SQLite connection and schema
 ├── market_data.py   → public interface
-├── sync.py          → synchronization with Yahoo Finance / FactSet
+├── mock_data.py     → static fixtures for offline development
 ├── save_closing.py  → EOD snapshot for the Volatility Surface
-└── mock_data.py     → static fixtures for offline development
+└── sync.py          → synchronization with Yahoo Finance / FactSet
+
 ```
  
 ### Pricing Engine — `backend/pricing/`
