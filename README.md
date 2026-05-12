@@ -93,7 +93,60 @@ backend/data/
  
 ### Pricing Engine — `backend/pricing/`
  
-*To be completed by [Name]*
+*To be completed by [Giorgio Galdiolo]*
+
+The Pricing Engine is the computational core of the platform. It receives market data from the Data Layer and transforms it into theoretical option prices and Greeks. No other module performs pricing calculations — all valuation logic is centralized here.
+
+The engine exposes two functions: `binomial_tree()` for option pricing and `calcola_greeks()` for sensitivity analysis. Both functions accept the same five market parameters (S, K, T, r, sigma) plus an option type, with no preprocessing required — they consume the output of `get_pricing_inputs()` directly.
+
+The `binomial_tree()` function implements the Cox-Ross-Rubinstein (CRR) model. It discretizes time into n steps (default 200), building a recombining tree where at each node the underlying can move up by u = exp(σ√dt) or down by d = 1/u. The algorithm works backward from expiration, calculating option values via risk-neutral probabilities. For American options, it compares continuation value against immediate exercise at every node. As n increases, the binomial tree converges to the Black-Scholes continuous-time model.
+
+The `calcola_greeks()` function uses Black-Scholes closed-form solutions to compute Delta, Gamma, Theta, Vega and Rho analytically. These Greeks are calculated assuming European exercise. Theta is expressed per day (divided by 365), Vega per 1% change in volatility (divided by 100), and Rho per 1% change in interest rate (divided by 100) to match market convention.
+
+The theoretical price from the binomial tree is then compared against the market mid-price (bid + ask)/2 obtained from the Data Layer. This difference reveals potential mispricings or model limitations.
+
+**Public interface** — other modules import only from the two pricing functions:
+
+```python
+from backend.pricing.binomial_tree import binomial_tree
+from backend.pricing.greeks import calcola_greeks
+```
+
+`binomial_tree(S, K, T, r, sigma, option_type, american, n=200)` → theoretical price  
+`calcola_greeks(S, K, T, r, sigma, option_type)` → dictionary of Greeks
+
+Typical usage with Data Layer integration:
+
+```python
+from backend.data.market_data import get_pricing_inputs
+from backend.pricing.binomial_tree import binomial_tree
+from backend.pricing.greeks import calcola_greeks
+
+# Get market data
+inputs = get_pricing_inputs("AAPL", "2026-06-19", "call", 270.0)
+
+# Price the option
+price = binomial_tree(
+    inputs.S, inputs.K, inputs.T, inputs.r, inputs.sigma,
+    option_type="call", american=False, n=200
+)
+
+# Calculate Greeks
+greeks = calcola_greeks(
+    inputs.S, inputs.K, inputs.T, inputs.r, inputs.sigma,
+    option_type="call"
+)
+
+# Compare with market
+market_mid = (inputs.bid + inputs.ask) / 2
+print(f"Theoretical: ${price:.2f} vs Market: ${market_mid:.2f}")
+```
+
+**Files**
+backend/pricing/
+├── binomial_tree.py  → CRR Binomial Tree for European and American options
+└── greeks.py         → Black-Scholes Greeks (Delta, Gamma, Theta, Vega, Rho)
+
  
 ### Volatility Surface — `backend/surface/`
  
