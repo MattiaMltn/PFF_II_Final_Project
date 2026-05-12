@@ -40,13 +40,16 @@ def binomial_tree(
         raise ValueError("option_type must be 'call' or 'put'")
 
     if n <= 0:
-        raise ValueError("Number of steps n must be positive")
+        raise ValueError(f"Number of steps n must be positive, got {n}")
 
     if T <= 0:
-        raise ValueError("Time to expiration T must be positive")
+        raise ValueError(f"Time to expiry T must be positive, got {T}")
 
     if sigma <= 0:
-        raise ValueError("Volatility sigma must be positive")
+        raise ValueError(f"Volatility sigma must be positive, got {sigma}")
+
+    if S <= 0:
+        raise ValueError(f"Spot price S must be positive, got {S}")
 
     # Time step size
     dt = T / n
