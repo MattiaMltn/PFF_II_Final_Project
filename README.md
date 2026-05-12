@@ -12,10 +12,10 @@ This platform allows the user to price options using the Binomial Tree CRR model
 - [Nome] — Frontend Streamlit e LLM
 
 
-## Avvio
+## Frontend
 streamlit run frontend/app.py
 
-## Struttura
+## Structure 
 ```
 backend/data/        → market data, SQLite database, public interface
 backend/pricing/     → Binomial Tree CRR, Greeks
