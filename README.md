@@ -7,9 +7,9 @@ This platform allows the user to price options using the Binomial Tree CRR model
 
 ## Team
 - [Mattia Molteni] — Data layer e database
-- [Nome] — Pricing engine (Binomial Tree, Greeks)
-- [Nome] — Volatility surface
-- [Nome] — Frontend Streamlit e LLM
+- [Giorgio Galdiolo] — Pricing engine (Binomial Tree, Greeks)
+- [Stefano Martino] — Volatility surface
+- [Federico Rigoni] — Frontend Streamlit e LLM
 
 
 ## Frontend
