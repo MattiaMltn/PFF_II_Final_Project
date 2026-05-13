@@ -13,6 +13,27 @@ standard CRR implementations.
 import numpy as np
 
 
+def _calculate_crr_parameters(sigma: float, r: float, dt: float) -> tuple[float, float, float]:
+    """
+    Calculate Cox-Ross-Rubinstein model parameters.
+
+    Args:
+        sigma: Volatility as decimal
+        r: Risk-free rate as decimal
+        dt: Time step size
+
+    Returns:
+        Tuple of (u, d, p) where:
+        - u: Up factor
+        - d: Down factor
+        - p: Risk-neutral probability
+    """
+    u = np.exp(sigma * np.sqrt(dt))
+    d = 1 / u
+    p = (np.exp(r * dt) - d) / (u - d)
+    return u, d, p
+
+
 def binomial_tree(
     S: float,
     K: float,
@@ -54,14 +75,7 @@ def binomial_tree(
     # Time step size
     dt = T / n
 
-    # CRR model parameters
-    # Up and down factors for the recombining tree
-    u = np.exp(sigma * np.sqrt(dt))
-    d = 1 / u
-
-    # Risk-neutral probability of up move
-    # No-arbitrage probability under risk-neutral measure
-    p = (np.exp(r * dt) - d) / (u - d)
+    u, d, p = _calculate_crr_parameters(sigma, r, dt)
 
     # Discount factor for one time step
     discount = np.exp(-r * dt)
