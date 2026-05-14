@@ -128,3 +128,30 @@ def sync_ticker(ticker: str, option_type: str) -> None:
                 ticker,
                 exp,
             )
+
+
+def sync_all_tickers() -> dict[str, int]:
+    """Sync all supported tickers for both call and put from Yahoo Finance.
+
+    Returns:
+        Dict mapping ticker to total rows synced (call + put combined).
+    """
+    from backend.data.config import SUPPORTED_TICKERS
+
+    results = {}
+    for ticker in SUPPORTED_TICKERS:
+        total = 0
+        for option_type in ("call", "put"):
+            try:
+                sync_ticker(ticker, option_type)
+                logger.info("Synced %s %s successfully.", ticker, option_type)
+                total += 1
+            except Exception as exc:
+                logger.warning("Failed to sync %s %s: %s", ticker, option_type, exc)
+        results[ticker] = total
+    return results
+
+
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
+    sync_all_tickers()
