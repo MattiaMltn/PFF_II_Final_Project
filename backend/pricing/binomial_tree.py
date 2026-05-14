@@ -43,6 +43,7 @@ def binomial_tree(
     option_type: str,
     american: bool,
     n: int = 200,
+    verbose: bool = False,
 ) -> float:
     """Compute option price with the Cox-Ross-Rubinstein binomial tree.
 
@@ -51,6 +52,8 @@ def binomial_tree(
       - `option_type`: 'call' or 'put'
       - `american`: True if early exercise is allowed
       - `n`: number of time steps
+      - `verbose`: if True, print debug info (CRR params, tree size, price);
+        useful for debugging and educational purposes
 
     The function returns the option price as a float. It raises
     ValueError for invalid inputs such as non-positive time or
@@ -76,6 +79,8 @@ def binomial_tree(
     dt = T / n
 
     u, d, p = _calculate_crr_parameters(sigma, r, dt)
+    if verbose:
+        print(f"[DEBUG] CRR Parameters: u={u:.6f}, d={d:.6f}, p={p:.6f}")
 
     # Discount factor for one time step
     discount = np.exp(-r * dt)
@@ -83,6 +88,8 @@ def binomial_tree(
     # Build the asset price tree at maturity (time T)
     # Prices at expiration: for j up-moves the price is S * u**j * d**(n-j)
     asset_prices = np.array([S * (u**j) * (d ** (n - j)) for j in range(n + 1)])
+    if verbose:
+        print(f"[DEBUG] Tree size: {n} steps, {n + 1} terminal nodes")
 
     # Calculate option payoff at maturity for each final node
     if option_type == "call":
@@ -123,4 +130,7 @@ def binomial_tree(
             option_values = continuation_values
 
     # The value at the root node (time 0) is the option price
-    return float(option_values[0])
+    price = float(option_values[0])
+    if verbose:
+        print(f"[DEBUG] Option price: ${price:.4f}")
+    return price
