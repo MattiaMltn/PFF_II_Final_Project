@@ -7,7 +7,7 @@ populated, so the network is touched only once per test run.
 
 import datetime
 
-import pymysql
+import psycopg2
 import pytest
 
 import backend.data.database as db_module
@@ -28,35 +28,25 @@ from backend.data.save_closing import save_closing_snapshot
 
 @pytest.fixture
 def test_db(monkeypatch):
-    """Create a temporary MySQL test database, patch DB_CONFIG, and clean up."""
+    """Create a temporary PostgreSQL schema, patch DB_CONFIG, and clean up."""
     base = db_module.DB_CONFIG
-    test_db_name = "test_pff_ii_temp"
+    test_schema = "test_pff_ii_temp"
 
-    admin = pymysql.connect(
-        host=base["host"],
-        user=base["user"],
-        password=base["password"],
-        charset="utf8mb4",
-    )
+    admin = psycopg2.connect(**base)
+    admin.autocommit = True
     with admin.cursor() as cur:
-        cur.execute(f"CREATE DATABASE IF NOT EXISTS `{test_db_name}`")
-    admin.commit()
+        cur.execute(f'CREATE SCHEMA IF NOT EXISTS "{test_schema}"')
     admin.close()
 
-    test_cfg = {**base, "database": test_db_name}
+    test_cfg = {**base, "options": f"-c search_path={test_schema}"}
     monkeypatch.setattr(db_module, "DB_CONFIG", test_cfg)
 
     yield test_cfg
 
-    admin = pymysql.connect(
-        host=base["host"],
-        user=base["user"],
-        password=base["password"],
-        charset="utf8mb4",
-    )
+    admin = psycopg2.connect(**base)
+    admin.autocommit = True
     with admin.cursor() as cur:
-        cur.execute(f"DROP DATABASE IF EXISTS `{test_db_name}`")
-    admin.commit()
+        cur.execute(f'DROP SCHEMA IF EXISTS "{test_schema}" CASCADE')
     admin.close()
 
 
@@ -83,10 +73,10 @@ def test_init_db_creates_all_tables(test_db) -> None:
     with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute(
-            "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES"
-            " WHERE TABLE_SCHEMA = DATABASE()"
+            "SELECT table_name FROM information_schema.tables"
+            " WHERE table_schema = current_schema()"
         )
-        tables = {r["TABLE_NAME"] for r in cursor.fetchall()}
+        tables = {r["table_name"] for r in cursor.fetchall()}
     assert {"spot_price", "option_chain", "closing_snapshot"}.issubset(tables)
 
 
@@ -96,10 +86,10 @@ def test_option_chain_schema_columns(test_db) -> None:
     with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute(
-            "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS"
-            " WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'option_chain'"
+            "SELECT column_name FROM information_schema.columns"
+            " WHERE table_schema = current_schema() AND table_name = 'option_chain'"
         )
-        cols = {r["COLUMN_NAME"] for r in cursor.fetchall()}
+        cols = {r["column_name"] for r in cursor.fetchall()}
     required = {
         "id", "ticker", "expiration", "strike", "option_type",
         "implied_vol", "bid", "ask", "last_price", "fetched_at",
@@ -113,10 +103,10 @@ def test_closing_snapshot_schema_columns(test_db) -> None:
     with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute(
-            "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS"
-            " WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'closing_snapshot'"
+            "SELECT column_name FROM information_schema.columns"
+            " WHERE table_schema = current_schema() AND table_name = 'closing_snapshot'"
         )
-        cols = {r["COLUMN_NAME"] for r in cursor.fetchall()}
+        cols = {r["column_name"] for r in cursor.fetchall()}
     required = {
         "id", "ticker", "snapshot_date", "expiration", "strike",
         "option_type", "implied_vol", "saved_at",

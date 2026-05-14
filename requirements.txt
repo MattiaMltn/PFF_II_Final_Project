@@ -1,4 +1,4 @@
-pymysql
+psycopg2
 python-dotenv
 yfinance
 pandas

@@ -1,36 +1,37 @@
-"""MySQL connection and schema for the options data layer."""
+"""PostgreSQL connection and schema for the options data layer."""
 
 import os
 from collections.abc import Generator
 from contextlib import contextmanager
 
-import pymysql
-import pymysql.cursors
+import psycopg2
+from psycopg2.extras import RealDictCursor
 from dotenv import load_dotenv
 
 load_dotenv()
 
 DB_CONFIG: dict = {
     "host": os.getenv("DB_HOST", "localhost"),
+    "port": int(os.getenv("DB_PORT", "5432")),
     "user": os.getenv("DB_USER"),
     "password": os.getenv("DB_PASSWORD"),
-    "database": os.getenv("DB_NAME"),
-    "charset": "utf8mb4",
+    "dbname": os.getenv("DB_NAME"),
 }
 
 
 @contextmanager
-def get_connection() -> Generator[pymysql.connections.Connection, None, None]:
-    """Yield an open MySQL connection; commits on success, rolls back on error.
+def get_connection() -> Generator[psycopg2.extensions.connection, None, None]:
+    """Yield an open PostgreSQL connection; commits on success, rolls back on error.
 
     Args:
         None
 
     Returns:
-        Context manager yielding a pymysql Connection configured with DictCursor
-        as the default cursor class.
+        Context manager yielding a psycopg2 connection configured with
+        RealDictCursor so rows support row["column"] access.
     """
-    conn = pymysql.connect(**DB_CONFIG, cursorclass=pymysql.cursors.DictCursor)
+    conn = psycopg2.connect(**DB_CONFIG, cursor_factory=RealDictCursor)
+    conn.autocommit = False
     try:
         yield conn
         conn.commit()
@@ -41,13 +42,9 @@ def get_connection() -> Generator[pymysql.connections.Connection, None, None]:
         conn.close()
 
 
-def _create_index(cursor: pymysql.cursors.DictCursor, sql: str) -> None:
-    """Execute a CREATE INDEX statement, silently skipping if already exists."""
-    try:
-        cursor.execute(sql)
-    except pymysql.err.OperationalError as exc:
-        if exc.args[0] != 1061:  # 1061 = Duplicate key name
-            raise
+def _create_index(cursor: RealDictCursor, sql: str) -> None:
+    """Execute a CREATE INDEX IF NOT EXISTS statement."""
+    cursor.execute(sql)
 
 
 def init_db() -> None:
@@ -67,10 +64,10 @@ def init_db() -> None:
         cursor.execute(
             """
             CREATE TABLE IF NOT EXISTS spot_price (
-                id         INT         AUTO_INCREMENT PRIMARY KEY,
-                ticker     VARCHAR(20) NOT NULL,
-                price      DOUBLE      NOT NULL,
-                fetched_at VARCHAR(30) NOT NULL
+                id         SERIAL           PRIMARY KEY,
+                ticker     VARCHAR(20)      NOT NULL,
+                price      DOUBLE PRECISION NOT NULL,
+                fetched_at VARCHAR(30)      NOT NULL
             )
             """
         )
@@ -78,16 +75,16 @@ def init_db() -> None:
         cursor.execute(
             """
             CREATE TABLE IF NOT EXISTS option_chain (
-                id          INT         AUTO_INCREMENT PRIMARY KEY,
-                ticker      VARCHAR(20) NOT NULL,
-                expiration  VARCHAR(10) NOT NULL,
-                strike      DOUBLE      NOT NULL,
-                option_type VARCHAR(4)  NOT NULL,
-                implied_vol DOUBLE,
-                bid         DOUBLE,
-                ask         DOUBLE,
-                last_price  DOUBLE,
-                fetched_at  VARCHAR(30) NOT NULL,
+                id          SERIAL           PRIMARY KEY,
+                ticker      VARCHAR(20)      NOT NULL,
+                expiration  VARCHAR(10)      NOT NULL,
+                strike      DOUBLE PRECISION NOT NULL,
+                option_type TEXT             NOT NULL,
+                implied_vol DOUBLE PRECISION,
+                bid         DOUBLE PRECISION,
+                ask         DOUBLE PRECISION,
+                last_price  DOUBLE PRECISION,
+                fetched_at  VARCHAR(30)      NOT NULL,
                 CONSTRAINT chk_option_type CHECK (option_type IN ('call', 'put'))
             )
             """
@@ -96,14 +93,14 @@ def init_db() -> None:
         cursor.execute(
             """
             CREATE TABLE IF NOT EXISTS closing_snapshot (
-                id            INT         AUTO_INCREMENT PRIMARY KEY,
-                ticker        VARCHAR(20) NOT NULL,
-                snapshot_date VARCHAR(10) NOT NULL,
-                expiration    VARCHAR(10) NOT NULL,
-                strike        DOUBLE      NOT NULL,
-                option_type   VARCHAR(4)  NOT NULL,
-                implied_vol   DOUBLE,
-                saved_at      VARCHAR(30) NOT NULL,
+                id            SERIAL           PRIMARY KEY,
+                ticker        VARCHAR(20)      NOT NULL,
+                snapshot_date VARCHAR(10)      NOT NULL,
+                expiration    VARCHAR(10)      NOT NULL,
+                strike        DOUBLE PRECISION NOT NULL,
+                option_type   TEXT             NOT NULL,
+                implied_vol   DOUBLE PRECISION,
+                saved_at      VARCHAR(30)      NOT NULL,
                 CONSTRAINT chk_cs_option_type CHECK (option_type IN ('call', 'put'))
             )
             """
@@ -111,16 +108,16 @@ def init_db() -> None:
 
         _create_index(
             cursor,
-            "CREATE INDEX idx_option_chain_lookup"
+            "CREATE INDEX IF NOT EXISTS idx_option_chain_lookup"
             " ON option_chain(ticker, option_type, expiration, fetched_at)",
         )
         _create_index(
             cursor,
-            "CREATE INDEX idx_spot_price_lookup"
+            "CREATE INDEX IF NOT EXISTS idx_spot_price_lookup"
             " ON spot_price(ticker, fetched_at)",
         )
         _create_index(
             cursor,
-            "CREATE INDEX idx_closing_snapshot_lookup"
+            "CREATE INDEX IF NOT EXISTS idx_closing_snapshot_lookup"
             " ON closing_snapshot(ticker, snapshot_date, option_type)",
         )

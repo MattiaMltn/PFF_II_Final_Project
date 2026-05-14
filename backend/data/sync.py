@@ -1,4 +1,4 @@
-"""Synchronize market data from Yahoo Finance into the MySQL database."""
+"""Synchronize market data from Yahoo Finance into the PostgreSQL database."""
 
 import datetime
 import logging

@@ -10,4 +10,5 @@ SUPPORTED_TICKERS = [
     "GS",
     "SPY",
     "QQQ",
+    "ASML"
 ]
