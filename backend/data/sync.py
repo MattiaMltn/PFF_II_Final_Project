@@ -139,7 +139,7 @@ def sync_all_tickers() -> dict[str, int]:
     from backend.data.config import WORKFLOW_TICKERS
 
     results = {}
-    for ticker in SUPPORTED_TICKERS:
+    for ticker in WORKFLOW_TICKERS:
         total = 0
         for option_type in ("call", "put"):
             try:
