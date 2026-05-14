@@ -136,7 +136,7 @@ def sync_all_tickers() -> dict[str, int]:
     Returns:
         Dict mapping ticker to total rows synced (call + put combined).
     """
-    from backend.data.config import SUPPORTED_TICKERS
+    from backend.data.config import WORKFLOW_TICKERS
 
     results = {}
     for ticker in SUPPORTED_TICKERS:
