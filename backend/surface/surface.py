@@ -29,25 +29,27 @@ def get_vol_surface_history(ticker: str, option_type: str) -> dict:
     Returns {'dates': [], 'surfaces': []} if no data is available.
     """
     with get_connection() as conn:
-        rows = conn.execute(
+        cursor = conn.cursor()
+        cursor.execute(
             """
             SELECT snapshot_date, expiration, strike, implied_vol
             FROM closing_snapshot
-            WHERE ticker = ? AND option_type = ?
+            WHERE ticker = %s AND option_type = %s
             ORDER BY snapshot_date, expiration, strike
             """,
             (ticker.upper(), option_type),
-        ).fetchall()
+        )
+        rows = cursor.fetchall()
 
     if not rows:
         return {"dates": [], "surfaces": []}
 
     surfaces = [
         {
-            "snapshot_date": row[0],
-            "expiration": row[1],
-            "strike": row[2],
-            "implied_vol": row[3],
+            "snapshot_date": str(row["snapshot_date"]),
+            "expiration": str(row["expiration"]),
+            "strike": row["strike"],
+            "implied_vol": row["implied_vol"],
         }
         for row in rows
     ]
