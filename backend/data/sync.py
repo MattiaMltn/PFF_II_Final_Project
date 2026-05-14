@@ -1,4 +1,4 @@
-"""Synchronize market data from Yahoo Finance into the local SQLite database."""
+"""Synchronize market data from Yahoo Finance into the PostgreSQL database."""
 
 import datetime
 import logging
@@ -70,8 +70,9 @@ def sync_ticker(ticker: str, option_type: str) -> None:
         raise RuntimeError(f"Could not obtain spot price for {ticker}")
 
     with get_connection() as conn:
-        conn.execute(
-            "INSERT INTO spot_price (ticker, price, fetched_at) VALUES (?, ?, ?)",
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO spot_price (ticker, price, fetched_at) VALUES (%s, %s, %s)",
             (upper, spot, fetched_at),
         )
 
@@ -84,6 +85,7 @@ def sync_ticker(ticker: str, option_type: str) -> None:
     df_col = "calls" if option_type == "call" else "puts"
 
     with get_connection() as conn:
+        cursor = conn.cursor()
         for exp in expirations:
             try:
                 chain = yt.option_chain(exp)
@@ -110,12 +112,12 @@ def sync_ticker(ticker: str, option_type: str) -> None:
                     )
                 )
 
-            conn.executemany(
+            cursor.executemany(
                 """
                 INSERT INTO option_chain
                     (ticker, expiration, strike, option_type,
                      implied_vol, bid, ask, last_price, fetched_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """,
                 rows,
             )
