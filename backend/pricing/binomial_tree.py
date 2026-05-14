@@ -102,11 +102,8 @@ def binomial_tree(
     # Backward induction through the tree
     # Step back through the tree to compute option values at earlier times
     for i in range(n - 1, -1, -1):
-        # Asset prices at time step i
-        # At step i, there are i+1 nodes
-        asset_prices = np.array(
-            [S * (u**j) * (d ** (i - j)) for j in range(i + 1)]
-        )
+        # Asset prices at step i derived from maturity prices via scaling
+        asset_prices_i = asset_prices[:i + 1] * (u ** (n - i))
 
         # Calculate continuation value at each node
         # Risk-neutral expected value of the option one step ahead,
@@ -119,9 +116,9 @@ def binomial_tree(
         if american:
             # Calculate immediate exercise value at each node
             if option_type == "call":
-                exercise_values = np.maximum(asset_prices - K, 0.0)
+                exercise_values = np.maximum(asset_prices_i - K, 0.0)
             else:  # put
-                exercise_values = np.maximum(K - asset_prices, 0.0)
+                exercise_values = np.maximum(K - asset_prices_i, 0.0)
 
             # Choose the better of continuing or exercising now
             option_values = np.maximum(continuation_values, exercise_values)
