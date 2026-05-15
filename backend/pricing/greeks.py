@@ -30,6 +30,10 @@ import numpy as np
 from scipy.stats import norm
 
 
+# Valid option types
+VALID_OPTION_TYPES = {"call", "put"}
+
+
 def calcola_greeks(
     S: float,
     K: float,
@@ -120,9 +124,10 @@ def calcola_greeks(
           for more accurate Greeks (not implemented here)
     """
     # Input validation
-    if option_type not in ["call", "put"]:
+    if option_type not in VALID_OPTION_TYPES:
         raise ValueError(
-            f"option_type must be 'call' or 'put', got '{option_type}'"
+            f"option_type must be one of {VALID_OPTION_TYPES}, "
+            f"got '{option_type}'"
         )
 
     if T <= 0:

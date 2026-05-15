@@ -13,6 +13,10 @@ standard CRR implementations.
 import numpy as np
 
 
+# Valid option types
+VALID_OPTION_TYPES = {"call", "put"}
+
+
 def _calculate_crr_parameters(sigma: float, r: float, dt: float) -> tuple[float, float, float]:
     """
     Calculate Cox-Ross-Rubinstein model parameters.
@@ -60,8 +64,11 @@ def binomial_tree(
     non-positive volatility.
     """
     # Input validation
-    if option_type not in ["call", "put"]:
-        raise ValueError("option_type must be 'call' or 'put'")
+    if option_type not in VALID_OPTION_TYPES:
+        raise ValueError(
+            f"option_type must be one of {VALID_OPTION_TYPES}, "
+            f"got '{option_type}'"
+        )
 
     if n <= 0:
         raise ValueError(f"Number of steps n must be positive, got {n}")
