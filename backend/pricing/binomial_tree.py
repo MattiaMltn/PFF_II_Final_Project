@@ -51,17 +51,67 @@ def binomial_tree(
 ) -> float:
     """Compute option price with the Cox-Ross-Rubinstein binomial tree.
 
-    Simple, well-documented implementation. Parameters:
-      - `S`, `K`, `T`, `r`, `sigma`: standard option inputs
-      - `option_type`: 'call' or 'put'
-      - `american`: True if early exercise is allowed
-      - `n`: number of time steps
-      - `verbose`: if True, print debug info (CRR params, tree size, price);
-        useful for debugging and educational purposes
+    The CRR model discretizes time into n equal steps of length dt = T/n.
+    At each node the underlying can move up by factor u = exp(sigma*sqrt(dt))
+    or down by d = 1/u.  The risk-neutral probability of an up-move is
+    p = (exp(r*dt) - d) / (u - d).  A recombining tree of (n+1) terminal
+    nodes is built, payoffs are evaluated at expiration, and the price is
+    recovered by backward induction discounting at the risk-free rate.
 
-    The function returns the option price as a float. It raises
-    ValueError for invalid inputs such as non-positive time or
-    non-positive volatility.
+    Args:
+        S: Current spot price of the underlying asset (must be > 0).
+        K: Strike price of the option (must be > 0).
+        T: Time to expiry in years (must be > 0).
+        r: Continuously-compounded risk-free rate as a decimal (e.g. 0.05 for 5%).
+        sigma: Annualised volatility as a decimal (e.g. 0.20 for 20%, must be > 0).
+        option_type: 'call' for a call option, 'put' for a put option.
+        american: True to allow early exercise (American-style),
+                  False for European-style options.
+        n: Number of time steps in the tree (default 200).
+           Higher values increase accuracy but raise O(n^2) memory and time cost.
+        verbose: If True, print debug info (CRR params, tree size, price);
+                 useful for debugging and educational purposes.
+
+    Returns:
+        Option fair value as a float, in the same currency units as S and K.
+
+    Raises:
+        ValueError: If option_type is not 'call' or 'put', or if any of
+                    n, T, sigma, S are non-positive.
+
+    Algorithm:
+        1. Compute CRR parameters u, d, p from sigma, r, dt.
+        2. Build terminal asset prices: S * u^j * d^(n-j) for j in 0..n.
+        3. Evaluate payoff at each terminal node.
+        4. Backward induction: discount expected value one step at a time;
+           for American options also check early-exercise value at each node.
+
+    Examples:
+        European call (Black-Scholes equivalent):
+        >>> price = binomial_tree(S=100, K=100, T=1.0, r=0.05,
+        ...                       sigma=0.20, option_type='call',
+        ...                       american=False, n=500)
+
+        American put with early exercise:
+        >>> price = binomial_tree(S=100, K=110, T=0.5, r=0.05,
+        ...                       sigma=0.25, option_type='put',
+        ...                       american=True, n=500)
+        # American put >= European put due to early-exercise premium.
+
+    Performance:
+        The pricing error relative to Black-Scholes decreases as O(1/n),
+        so doubling n halves the error.  n=100 is adequate for most uses;
+        n=500-1000 is recommended when high precision is required (e.g.
+        for fitting implied volatility or calculating Greeks numerically).
+        Memory and CPU scale as O(n^2), so very large n (>5000) may be slow.
+
+    Edge cases:
+        - Very short-dated options (T < 0.001): dt becomes tiny and
+          floating-point rounding can distort u, d, p. Prefer analytical
+          Black-Scholes for T < 0.001.
+        - Very high volatility (sigma > 5.0): risk-neutral probability p may
+          fall outside [0, 1], indicating the step size is too large; increase n.
+        - r = 0 is valid and handled correctly.
     """
     # Input validation
     if option_type not in VALID_OPTION_TYPES:
