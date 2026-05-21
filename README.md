@@ -97,7 +97,43 @@ backend/data/
  
 ### Volatility Surface — `backend/surface/`
  
-*To be completed by [Name]*
+### Volatility Surface — `backend/surface/`
+
+**Owner:** Stefano Martino
+
+The Volatility Surface module reads historical implied volatility snapshots
+accumulated daily in the `closing_snapshot` table (populated automatically
+every weekday at 22:00 by GitHub Actions) and returns structured data for
+3D surface visualization in the Streamlit dashboard.
+
+**Public interface:**
+
+```python
+from backend.surface.surface import get_vol_surface_history, get_surface_by_date
+
+# Returns full history across all dates
+history = get_vol_surface_history("AAPL", "call")
+# {
+#   "dates": ["2026-05-07", "2026-05-08", ...],
+#   "surfaces": [
+#       {"snapshot_date": "2026-05-07", "expiration": "2026-06-20",
+#        "strike": 200.0, "implied_vol": 0.243},
+#       ...
+#   ]
+# }
+
+# Returns surface data for a single date
+surface = get_surface_by_date("AAPL", "call", "2026-05-07")
+# {
+#   "expiration": ["2026-06-20", "2026-07-18", ...],
+#   "strike": [200.0, 210.0, ...],
+#   "implied_vol": [0.243, 0.251, ...]
+# }
+```
+
+**Files:**
+**Dependencies:** reads from `closing_snapshot` via `backend.data.database.get_connection`.
+No direct calls to Yahoo Finance or external APIs.
  
 ### LLM Explainer — `backend/llm/`
  
