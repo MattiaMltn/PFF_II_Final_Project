@@ -1,4 +1,4 @@
-"""Synchronize market data from Yahoo Finance into the local SQLite database."""
+"""Synchronize market data from Yahoo Finance into the PostgreSQL database."""
 
 import datetime
 import logging
@@ -70,8 +70,9 @@ def sync_ticker(ticker: str, option_type: str) -> None:
         raise RuntimeError(f"Could not obtain spot price for {ticker}")
 
     with get_connection() as conn:
-        conn.execute(
-            "INSERT INTO spot_price (ticker, price, fetched_at) VALUES (?, ?, ?)",
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO spot_price (ticker, price, fetched_at) VALUES (%s, %s, %s)",
             (upper, spot, fetched_at),
         )
 
@@ -84,6 +85,7 @@ def sync_ticker(ticker: str, option_type: str) -> None:
     df_col = "calls" if option_type == "call" else "puts"
 
     with get_connection() as conn:
+        cursor = conn.cursor()
         for exp in expirations:
             try:
                 chain = yt.option_chain(exp)
@@ -110,12 +112,12 @@ def sync_ticker(ticker: str, option_type: str) -> None:
                     )
                 )
 
-            conn.executemany(
+            cursor.executemany(
                 """
                 INSERT INTO option_chain
                     (ticker, expiration, strike, option_type,
                      implied_vol, bid, ask, last_price, fetched_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """,
                 rows,
             )
@@ -126,3 +128,30 @@ def sync_ticker(ticker: str, option_type: str) -> None:
                 ticker,
                 exp,
             )
+
+
+def sync_all_tickers() -> dict[str, int]:
+    """Sync all supported tickers for both call and put from Yahoo Finance.
+
+    Returns:
+        Dict mapping ticker to total rows synced (call + put combined).
+    """
+    from backend.data.config import WORKFLOW_TICKERS
+
+    results = {}
+    for ticker in WORKFLOW_TICKERS:
+        total = 0
+        for option_type in ("call", "put"):
+            try:
+                sync_ticker(ticker, option_type)
+                logger.info("Synced %s %s successfully.", ticker, option_type)
+                total += 1
+            except Exception as exc:
+                logger.warning("Failed to sync %s %s: %s", ticker, option_type, exc)
+        results[ticker] = total
+    return results
+
+
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
+    sync_all_tickers()

@@ -7,15 +7,15 @@ This platform allows the user to price options using the Binomial Tree CRR model
 
 ## Team
 - [Mattia Molteni] — Data layer e database
-- [Giorgio Galdiolo] — Pricing engine (Binomial Tree, Greeks)
+- [Nome] — Pricing engine (Binomial Tree, Greeks)
 - [Nome] — Volatility surface
 - [Nome] — Frontend Streamlit e LLM
 
 
-## Avvio
+## Frontend
 streamlit run frontend/app.py
 
-## Struttura
+## Structure 
 ```
 backend/data/        → market data, SQLite database, public interface
 backend/pricing/     → Binomial Tree CRR, Greeks

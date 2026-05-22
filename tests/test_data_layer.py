@@ -7,6 +7,7 @@ populated, so the network is touched only once per test run.
 
 import datetime
 
+import psycopg2
 import pytest
 
 import backend.data.database as db_module
@@ -23,6 +24,30 @@ from backend.data.save_closing import save_closing_snapshot
 
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
+
+
+@pytest.fixture
+def test_db(monkeypatch):
+    """Create a temporary PostgreSQL schema, patch DB_CONFIG, and clean up."""
+    base = db_module.DB_CONFIG
+    test_schema = "test_pff_ii_temp"
+
+    admin = psycopg2.connect(**base)
+    admin.autocommit = True
+    with admin.cursor() as cur:
+        cur.execute(f'CREATE SCHEMA IF NOT EXISTS "{test_schema}"')
+    admin.close()
+
+    test_cfg = {**base, "options": f"-c search_path={test_schema}"}
+    monkeypatch.setattr(db_module, "DB_CONFIG", test_cfg)
+
+    yield test_cfg
+
+    admin = psycopg2.connect(**base)
+    admin.autocommit = True
+    with admin.cursor() as cur:
+        cur.execute(f'DROP SCHEMA IF EXISTS "{test_schema}" CASCADE')
+    admin.close()
 
 
 @pytest.fixture(scope="session")
@@ -42,29 +67,29 @@ def sample_inputs(aapl_chain: dict) -> PricingInputs:
 # ── Schema tests ───────────────────────────────────────────────────────────────
 
 
-def test_init_db_creates_all_tables(tmp_path: object, monkeypatch: object) -> None:
+def test_init_db_creates_all_tables(test_db) -> None:
     """init_db must create spot_price, option_chain and closing_snapshot."""
-    monkeypatch.setattr(db_module, "DB_PATH", tmp_path / "test.db")
     init_db()
     with get_connection() as conn:
-        tables = {
-            r[0]
-            for r in conn.execute(
-                "SELECT name FROM sqlite_master WHERE type='table'"
-            ).fetchall()
-        }
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT table_name FROM information_schema.tables"
+            " WHERE table_schema = current_schema()"
+        )
+        tables = {r["table_name"] for r in cursor.fetchall()}
     assert {"spot_price", "option_chain", "closing_snapshot"}.issubset(tables)
 
 
-def test_option_chain_schema_columns(tmp_path: object, monkeypatch: object) -> None:
+def test_option_chain_schema_columns(test_db) -> None:
     """option_chain must have all required columns."""
-    monkeypatch.setattr(db_module, "DB_PATH", tmp_path / "test.db")
     init_db()
     with get_connection() as conn:
-        cols = {
-            r[1]
-            for r in conn.execute("PRAGMA table_info(option_chain)").fetchall()
-        }
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT column_name FROM information_schema.columns"
+            " WHERE table_schema = current_schema() AND table_name = 'option_chain'"
+        )
+        cols = {r["column_name"] for r in cursor.fetchall()}
     required = {
         "id", "ticker", "expiration", "strike", "option_type",
         "implied_vol", "bid", "ask", "last_price", "fetched_at",
@@ -72,19 +97,16 @@ def test_option_chain_schema_columns(tmp_path: object, monkeypatch: object) -> N
     assert required.issubset(cols)
 
 
-def test_closing_snapshot_schema_columns(
-    tmp_path: object, monkeypatch: object
-) -> None:
+def test_closing_snapshot_schema_columns(test_db) -> None:
     """closing_snapshot must have all required columns."""
-    monkeypatch.setattr(db_module, "DB_PATH", tmp_path / "test.db")
     init_db()
     with get_connection() as conn:
-        cols = {
-            r[1]
-            for r in conn.execute(
-                "PRAGMA table_info(closing_snapshot)"
-            ).fetchall()
-        }
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT column_name FROM information_schema.columns"
+            " WHERE table_schema = current_schema() AND table_name = 'closing_snapshot'"
+        )
+        cols = {r["column_name"] for r in cursor.fetchall()}
     required = {
         "id", "ticker", "snapshot_date", "expiration", "strike",
         "option_type", "implied_vol", "saved_at",
@@ -329,9 +351,11 @@ def test_save_closing_snapshot_rows_in_db(aapl_chain: dict) -> None:
     """closing_snapshot must contain rows for AAPL after save."""
     save_closing_snapshot("AAPL", "call")
     with get_connection() as conn:
-        row = conn.execute(
-            "SELECT COUNT(*) AS n FROM closing_snapshot WHERE ticker = 'AAPL'",
-        ).fetchone()
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT COUNT(*) AS n FROM closing_snapshot WHERE ticker = 'AAPL'"
+        )
+        row = cursor.fetchone()
     assert row["n"] > 0
 
 

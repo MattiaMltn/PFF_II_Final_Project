@@ -138,30 +138,33 @@ def get_option_chain(ticker: str, option_type: str) -> dict:
 
     upper = ticker.upper()
     with get_connection() as conn:
-        row = conn.execute(
+        cursor = conn.cursor()
+        cursor.execute(
             """
             SELECT MAX(fetched_at) AS max_ts
             FROM option_chain
-            WHERE ticker = ? AND option_type = ?
+            WHERE ticker = %s AND option_type = %s
             """,
             (upper, option_type),
-        ).fetchone()
+        )
+        row = cursor.fetchone()
         max_ts = row["max_ts"] if row else None
 
         if max_ts is None:
             return {"expirations": [], "strikes": {}}
 
         today = datetime.date.today().isoformat()
-        rows = conn.execute(
+        cursor.execute(
             """
             SELECT expiration, strike
             FROM option_chain
-            WHERE ticker = ? AND option_type = ? AND fetched_at = ?
-              AND expiration > ?
+            WHERE ticker = %s AND option_type = %s AND fetched_at = %s
+              AND expiration > %s
             ORDER BY expiration, strike
             """,
             (upper, option_type, max_ts, today),
-        ).fetchall()
+        )
+        rows = cursor.fetchall()
 
     strikes_by_exp: dict[str, list[float]] = {}
     for r in rows:
@@ -203,30 +206,33 @@ def get_pricing_inputs(
 
     upper = ticker.upper()
     with get_connection() as conn:
-        spot_row = conn.execute(
+        cursor = conn.cursor()
+        cursor.execute(
             """
             SELECT price FROM spot_price
-            WHERE ticker = ?
+            WHERE ticker = %s
             ORDER BY fetched_at DESC LIMIT 1
             """,
             (upper,),
-        ).fetchone()
+        )
+        spot_row = cursor.fetchone()
 
         if spot_row is None:
             raise ValueError(
                 f"No spot price found for {ticker}. Call get_option_chain first."
             )
 
-        opt_row = conn.execute(
+        cursor.execute(
             """
             SELECT implied_vol, bid, ask
             FROM option_chain
-            WHERE ticker = ? AND option_type = ? AND expiration = ?
-              AND ABS(strike - ?) < 1e-9
+            WHERE ticker = %s AND option_type = %s AND expiration = %s
+              AND ABS(strike - %s) < 1e-9
             ORDER BY fetched_at DESC LIMIT 1
             """,
             (upper, option_type, expiration, float(strike)),
-        ).fetchone()
+        )
+        opt_row = cursor.fetchone()
 
         if opt_row is None:
             raise ValueError(

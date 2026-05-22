@@ -43,14 +43,16 @@ def save_closing_snapshot(ticker: str, option_type: str) -> int:
     upper = ticker.upper()
 
     with get_connection() as conn:
-        row = conn.execute(
+        cursor = conn.cursor()
+        cursor.execute(
             """
             SELECT MAX(fetched_at) AS max_ts
             FROM option_chain
-            WHERE ticker = ? AND option_type = ?
+            WHERE ticker = %s AND option_type = %s
             """,
             (upper, option_type),
-        ).fetchone()
+        )
+        row = cursor.fetchone()
         max_ts = row["max_ts"] if row else None
 
         if max_ts is None:
@@ -61,14 +63,15 @@ def save_closing_snapshot(ticker: str, option_type: str) -> int:
             )
             return 0
 
-        source_rows = conn.execute(
+        cursor.execute(
             """
             SELECT expiration, strike, implied_vol
             FROM option_chain
-            WHERE ticker = ? AND option_type = ? AND fetched_at = ?
+            WHERE ticker = %s AND option_type = %s AND fetched_at = %s
             """,
             (upper, option_type, max_ts),
-        ).fetchall()
+        )
+        source_rows = cursor.fetchall()
 
         snapshot_rows = [
             (
@@ -83,12 +86,12 @@ def save_closing_snapshot(ticker: str, option_type: str) -> int:
             for r in source_rows
         ]
 
-        conn.executemany(
+        cursor.executemany(
             """
             INSERT INTO closing_snapshot
                 (ticker, snapshot_date, expiration, strike, option_type,
                  implied_vol, saved_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
             """,
             snapshot_rows,
         )
