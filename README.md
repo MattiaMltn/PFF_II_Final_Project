@@ -7,7 +7,7 @@ This platform allows the user to price options using the Binomial Tree CRR model
 
 ## Team
 - [Mattia Molteni] — Data layer e database
-- [Nome] — Pricing engine (Binomial Tree, Greeks)
+- [Giorgio Galdiolo] — Pricing engine (Binomial Tree, Greeks)
 - [Nome] — Volatility surface
 - [Nome] — Frontend Streamlit e LLM
 
@@ -143,9 +143,24 @@ print(f"Theoretical: ${price:.2f} vs Market: ${market_mid:.2f}")
 ```
 
 **Files**
+
+```
 backend/pricing/
 ├── binomial_tree.py  → CRR Binomial Tree for European and American options
 └── greeks.py         → Black-Scholes Greeks (Delta, Gamma, Theta, Vega, Rho)
+```
+**Testing**
+
+```bash
+python -m pytest tests/test_pricing.py -v
+```
+
+30 tests covering: Black-Scholes convergence, put-call parity, American vs European pricing, boundary conditions (deep ITM/OTM), Greeks ranges and symmetry properties, input validation.
+
+**Performance**
+
+Array operations optimized via pre-calculated asset prices and vectorized slicing.
+Benchmark: 10 calculations with n=500 complete in ~0.044s (~11x faster than naive implementation).
 
  
 ### Volatility Surface — `backend/surface/`
