@@ -91,8 +91,9 @@ def calcola_greeks(
 
     Raises:
         ValueError: If option_type is not 'call' or 'put'
-        ValueError: If T <= 0 (cannot calculate Greeks at or past expiration)
+        ValueError: If T <= 0 (time to expiry must be positive)
         ValueError: If sigma <= 0 (volatility must be positive)
+        ValueError: If K <= 0 (strike price must be positive)
         ValueError: If S <= 0 (spot price must be positive)
 
     Example:
@@ -131,20 +132,16 @@ def calcola_greeks(
         )
 
     if T <= 0:
-        raise ValueError(
-            f"Cannot calculate Greeks at or past expiration (T <= 0). "
-            f"Received T = {T}"
-        )
+        raise ValueError(f"Time to expiry T must be positive, got {T}")
 
     if sigma <= 0:
-        raise ValueError(
-            f"Volatility sigma must be positive. Received sigma = {sigma}"
-        )
+        raise ValueError(f"Volatility sigma must be positive, got {sigma}")
+
+    if K <= 0:
+        raise ValueError(f"Strike price K must be positive, got {K}")
 
     if S <= 0:
-        raise ValueError(
-            f"Spot price S must be positive. Received S = {S}"
-        )
+        raise ValueError(f"Spot price S must be positive, got {S}")
 
     # Calculate Black-Scholes d1 and d2 parameters
     # d1 = [ln(S/K) + (r + σ²/2)T] / (σ√T)
