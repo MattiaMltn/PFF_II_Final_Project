@@ -3,7 +3,7 @@ Unit tests for the Volatility Surface module.
 """
 
 import pytest
-from backend.surface.surface import get_vol_surface_history
+from backend.surface.surface import get_vol_surface_history, build_surface_grid
 
 
 def test_returns_correct_keys():
@@ -50,3 +50,46 @@ def test_ticker_is_case_insensitive():
     lower = get_vol_surface_history("aapl", "call")
     assert upper["dates"] == lower["dates"]
     assert len(upper["surfaces"]) == len(lower["surfaces"])
+
+
+def test_build_surface_grid_returns_none_for_unknown_ticker():
+    """build_surface_grid must return None when no data exists."""
+    result = build_surface_grid("FAKEXYZ", "call", "2026-05-07")
+    assert result is None
+
+
+def test_build_surface_grid_returns_correct_keys():
+    """build_surface_grid must return dict with K_grid, T_grid, IV_mesh."""
+    history = get_vol_surface_history("AAPL", "call")
+    if not history["dates"]:
+        pytest.skip("No data in database")
+    date = history["dates"][0]
+    result = build_surface_grid("AAPL", "call", date)
+    if result is not None:
+        assert "K_grid" in result
+        assert "T_grid" in result
+        assert "IV_mesh" in result
+        assert "snapshot_date" in result
+
+
+def test_build_surface_grid_shapes_match():
+    """K_grid, T_grid and IV_mesh must all have the same shape."""
+    history = get_vol_surface_history("AAPL", "call")
+    if not history["dates"]:
+        pytest.skip("No data in database")
+    date = history["dates"][0]
+    result = build_surface_grid("AAPL", "call", date)
+    if result is not None:
+        assert len(result["K_grid"]) == len(result["T_grid"]) == len(result["IV_mesh"])
+        assert len(result["K_grid"][0]) == len(result["T_grid"][0]) == len(result["IV_mesh"][0])
+
+
+def test_build_surface_grid_date_matches():
+    """snapshot_date in result must match the requested date."""
+    history = get_vol_surface_history("AAPL", "call")
+    if not history["dates"]:
+        pytest.skip("No data in database")
+    date = history["dates"][0]
+    result = build_surface_grid("AAPL", "call", date)
+    if result is not None:
+        assert result["snapshot_date"] == date

@@ -96,28 +96,38 @@ backend/data/
 *To be completed by [Name]*
  
 ### Volatility Surface — `backend/surface/`
- 
+
 **Owner:** Stefano Martino
 
 The Volatility Surface module reads historical implied volatility snapshots
-accumulated daily in the `closing_snapshot` table (populated automatically
-every weekday at 22:00 by GitHub Actions) and returns structured data for
-3D surface visualization in the Streamlit dashboard.
+accumulated daily in the `closing_snapshot` table and returns structured data
+for 3D surface visualization in the Streamlit dashboard.
+
+It exposes two functions:
+
+- `get_vol_surface_history` — returns all raw snapshots for a ticker, grouped
+  by date. Used to populate the date slider in the dashboard.
+- `build_surface_grid` — takes a single snapshot date and returns an
+  interpolated 3D grid (K_grid, T_grid, IV_mesh) ready for Plotly rendering.
+  Interpolation is performed with `scipy.interpolate.griddata` using cubic method
+  on a 30×30 regular grid.
 
 **Public interface:**
 
-from backend.surface.surface import get_vol_surface_history, get_surface_by_date
+```python
+from backend.surface.surface import get_vol_surface_history, build_surface_grid
 
 history = get_vol_surface_history("AAPL", "call")
-surface = get_surface_by_date("AAPL", "call", "2026-05-07")
+grid    = build_surface_grid("AAPL", "call", "2026-05-07")
+```
 
 **Files:**
-- backend/surface/__init__.py
-- backend/surface/surface.py
-- tests/test_surface.py — 12 tests, all passing
+- `backend/surface/__init__.py`
+- `backend/surface/surface.py`
+- `tests/test_surface.py` — 10 tests
 
-**Dependencies:** reads from closing_snapshot via backend.data.database.get_connection.
-No direct calls to Yahoo Finance or external APIs.
+**Dependencies:** `numpy`, `scipy`. Reads from `closing_snapshot` via
+`backend.data.database.get_connection`. No direct calls to external APIs.
  
 ### LLM Explainer — `backend/llm/`
  
