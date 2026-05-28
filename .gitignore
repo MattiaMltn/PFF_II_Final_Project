@@ -6,3 +6,10 @@ options_data.db
 test_manual
 .env
 SCOPE.md
+__pycache__/
+*.pyc
+*.pyo
+backend/data/__pycache__/database.cpython-314.pyc
+backend/data/__pycache__/market_data.cpython-314.pyc
+backend/data/__pycache__/mock_data.cpython-314.pyc
+backend/data/__pycache__/sync.cpython-314.pyc
