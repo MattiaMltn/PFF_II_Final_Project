@@ -163,3 +163,50 @@ def test_surface_by_date_returns_correct_values():
     assert result["expiration"] == ["2024-02-16", "2024-02-16", "2024-03-15"]
     assert result["strike"] == [150.0, 155.0, 160.0]
     assert result["implied_vol"] == [0.25, 0.27, 0.30]
+# ---------------------------------------------------------------------------
+# Integration tests (require live Supabase connection)
+# Run with: pytest -v -m integration
+# Skip with: pytest -v -m "not integration"
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.integration
+def test_integration_get_vol_surface_history_returns_data():
+    """Live DB: get_vol_surface_history must return non-empty data for AAPL."""
+    result = get_vol_surface_history("AAPL", "call")
+    assert "dates" in result
+    assert "surfaces" in result
+    assert len(result["dates"]) > 0, "Expected at least one snapshot date in Supabase"
+    assert len(result["surfaces"]) > 0, "Expected at least one row in closing_snapshot"
+
+
+@pytest.mark.integration
+def test_integration_surface_rows_structure():
+    """Live DB: every row returned must have the four required fields."""
+    result = get_vol_surface_history("AAPL", "call")
+    assert result["surfaces"], "No rows returned from live DB"
+    for row in result["surfaces"]:
+        assert "snapshot_date" in row
+        assert "expiration" in row
+        assert "strike" in row
+        assert "implied_vol" in row
+
+
+@pytest.mark.integration
+def test_integration_get_surface_by_date_returns_data():
+    """Live DB: get_surface_by_date must return data for the first available date."""
+    history = get_vol_surface_history("AAPL", "call")
+    assert history["dates"], "No dates available in live DB"
+    first_date = history["dates"][0]
+    result = get_surface_by_date("AAPL", "call", first_date)
+    assert len(result["expiration"]) > 0
+    assert len(result["strike"]) > 0
+    assert len(result["implied_vol"]) > 0
+
+
+@pytest.mark.integration
+def test_integration_unknown_ticker_returns_empty():
+    """Live DB: unknown ticker must return empty lists, not crash."""
+    result = get_vol_surface_history("FAKEXYZ999", "call")
+    assert result["dates"] == []
+    assert result["surfaces"] == []
