@@ -192,7 +192,7 @@ grid    = build_surface_grid("AAPL", "call", "2026-05-07")
 **Files:**
 - `backend/surface/__init__.py`
 - `backend/surface/surface.py`
-- `tests/test_surface.py` — 10 tests
+- `tests/test_surface.py` — 16 unit tests + 4 integration tests
 
 **Dependencies:** `numpy`, `scipy`. Reads from `closing_snapshot` via
 `backend.data.database.get_connection`. No direct calls to external APIs.
