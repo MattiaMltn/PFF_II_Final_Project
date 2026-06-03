@@ -164,8 +164,38 @@ Benchmark: 10 calculations with n=500 complete in ~0.044s (~11x faster than naiv
 
  
 ### Volatility Surface — `backend/surface/`
- 
-*To be completed by [Name]*
+
+**Owner:** Stefano Martino
+
+The Volatility Surface module reads historical implied volatility snapshots
+accumulated daily in the `closing_snapshot` table and returns structured data
+for 3D surface visualization in the Streamlit dashboard.
+
+It exposes two functions:
+
+- `get_vol_surface_history` — returns all raw snapshots for a ticker, grouped
+  by date. Used to populate the date slider in the dashboard.
+- `build_surface_grid` — takes a single snapshot date and returns an
+  interpolated 3D grid (K_grid, T_grid, IV_mesh) ready for Plotly rendering.
+  Interpolation is performed with `scipy.interpolate.griddata` using cubic method
+  on a 30×30 regular grid.
+
+**Public interface:**
+
+```python
+from backend.surface.surface import get_vol_surface_history, build_surface_grid
+
+history = get_vol_surface_history("AAPL", "call")
+grid    = build_surface_grid("AAPL", "call", "2026-05-07")
+```
+
+**Files:**
+- `backend/surface/__init__.py`
+- `backend/surface/surface.py`
+- `tests/test_surface.py` — 10 tests
+
+**Dependencies:** `numpy`, `scipy`. Reads from `closing_snapshot` via
+`backend.data.database.get_connection`. No direct calls to external APIs.
  
 ### LLM Explainer — `backend/llm/`
  
