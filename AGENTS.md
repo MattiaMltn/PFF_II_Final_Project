@@ -38,3 +38,17 @@ and explains results via Claude API.
 - Table for this module: `closing_snapshot`
   - Columns: snapshot_date, expiration, strike, implied_vol, ticker, option_type
 - Table is append-only — never UPDATE or DELETE rows 
+## Module Interface — `backend/surface/`
+
+### `get_vol_surface_history(ticker, option_type) -> dict`
+Returns all historical snapshots for a ticker.
+- Input: ticker (str, case-insensitive), option_type ('call' or 'put')
+- Output: `{"dates": [...], "surfaces": [{"snapshot_date", "expiration", "strike", "implied_vol"}, ...]}`
+- Returns `{"dates": [], "surfaces": []}` if no data found
+
+### `build_surface_grid(ticker, option_type, snapshot_date) -> dict | None`
+Builds an interpolated 3D grid for a single date.
+- Input: ticker (str), option_type (str), snapshot_date (str, YYYY-MM-DD)
+- Output: `{"snapshot_date": ..., "K_grid": [[...]], "T_grid": [[...]], "IV_mesh": [[...]]}`
+- Returns `None` if fewer than 4 data points are available for that date
+- Grid size: 30×30, interpolation method: cubic (scipy.interpolate.griddata)
