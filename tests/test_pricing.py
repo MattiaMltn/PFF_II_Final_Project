@@ -8,6 +8,7 @@ Covers:
 """
 
 import math
+from typing import Literal
 
 import pytest
 
@@ -105,7 +106,7 @@ class TestBinomialTree:
         ({"S": 0.0},      "S must be positive"),
         ({"S": -50.0},    "S must be positive"),
     ])
-    def test_invalid_parameters(self, overrides, match):
+    def test_invalid_parameters(self, overrides: dict[str, int] | dict[str, float], match: Literal['n must be positive'] | Literal['T must be positive'] | Literal['sigma must be positive'] | Literal['S must be positive']):
         """ValueError raised for non-positive n, T, sigma, or S."""
         kwargs = dict(S=_S, K=_K, T=_T, r=_r, sigma=_sigma,
                       option_type="call", american=False)
@@ -180,7 +181,7 @@ class TestGreeks:
         ({"S": 0.0},      "S must be positive"),
         ({"S": -100.0},   "S must be positive"),
     ])
-    def test_greeks_invalid_parameters(self, overrides, match):
+    def test_greeks_invalid_parameters(self, overrides: dict[str, float], match: Literal['T must be positive'] | Literal['sigma must be positive'] | Literal['K must be positive'] | Literal['S must be positive']):
         """ValueError raised for non-positive T, sigma, K, or S."""
         kwargs = dict(S=_S, K=_K, T=_T, r=_r, sigma=_sigma,
                       option_type="call")

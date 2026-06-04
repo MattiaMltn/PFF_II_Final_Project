@@ -1,4 +1,6 @@
-SUPPORTED_TICKERS = [
+
+# Tickers synced daily by GitHub Actions
+WORKFLOW_TICKERS = [
     "AAPL",
     "MSFT",
     "GOOGL",
