@@ -186,3 +186,47 @@ class TestGreeks:
         kwargs.update(overrides)
         with pytest.raises(ValueError, match=match):
             calcola_greeks(**kwargs)
+
+
+# ---------------------------------------------------------------------------
+# TestGreeksAmerican
+# ---------------------------------------------------------------------------
+
+class TestGreeksAmerican:
+
+    def test_american_put_delta_itm_more_negative_than_european(self):
+        """Deep ITM American put delta must be more negative than European."""
+        eur = calcola_greeks(S=80, K=100, T=1.0, r=0.05, sigma=0.20,
+                             option_type="put", american=False)
+        amr = calcola_greeks(S=80, K=100, T=1.0, r=0.05, sigma=0.20,
+                             option_type="put", american=True)
+        assert abs(amr["delta"]) > abs(eur["delta"])
+
+    def test_american_call_delta_equals_european(self):
+        """American call delta equals European call delta (no early exercise)."""
+        eur = calcola_greeks(S=100, K=100, T=1.0, r=0.05, sigma=0.20,
+                             option_type="call", american=False)
+        amr = calcola_greeks(S=100, K=100, T=1.0, r=0.05, sigma=0.20,
+                             option_type="call", american=True)
+        assert amr["delta"] == pytest.approx(eur["delta"], abs=0.01)
+
+    def test_american_gamma_positive(self):
+        """American Greeks: gamma must be positive for both call and put."""
+        for otype in ("call", "put"):
+            g = calcola_greeks(S=100, K=100, T=1.0, r=0.05, sigma=0.20,
+                               option_type=otype, american=True)
+            assert g["gamma"] > 0.0
+
+    def test_american_vega_positive(self):
+        """American Greeks: vega must be positive for both call and put."""
+        for otype in ("call", "put"):
+            g = calcola_greeks(S=100, K=100, T=1.0, r=0.05, sigma=0.20,
+                               option_type=otype, american=True)
+            assert g["vega"] > 0.0
+
+    def test_american_theta_negative_atm(self):
+        """American Greeks: theta must be negative for ATM options."""
+        for otype in ("call", "put"):
+            g = calcola_greeks(S=100, K=100, T=1.0, r=0.05, sigma=0.20,
+                               option_type=otype, american=True)
+            assert g["theta"] < 0.0
