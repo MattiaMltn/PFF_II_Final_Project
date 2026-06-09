@@ -29,6 +29,8 @@ References:
 import numpy as np
 from scipy.stats import norm
 
+from backend.pricing.binomial_tree import binomial_tree
+
 
 # Valid option types
 VALID_OPTION_TYPES = {"call", "put"}
@@ -41,6 +43,8 @@ def calcola_greeks(
     r: float,
     sigma: float,
     option_type: str,
+    american: bool = False,
+    n: int = 200,
 ) -> dict[str, float]:
     """
     Calculate option Greeks using Black-Scholes analytical formulas.
@@ -142,6 +146,38 @@ def calcola_greeks(
 
     if S <= 0:
         raise ValueError(f"Spot price S must be positive, got {S}")
+
+    if american:
+        dS   = S * 0.01
+        dsig = 0.001
+        dr   = 0.0001
+        dt   = 1.0 / 252
+
+        def bt(S_, T_, r_, sig_):
+            return binomial_tree(S_, K, T_, r_, sig_, option_type, True, n)
+
+        p0    = bt(S,      T,      r,      sigma)
+        p_sup = bt(S + dS, T,      r,      sigma)
+        p_sdn = bt(S - dS, T,      r,      sigma)
+        p_vup = bt(S,      T,      r,      sigma + dsig)
+        p_vdn = bt(S,      T,      r,      sigma - dsig)
+        p_rup = bt(S,      T,      r + dr, sigma)
+        p_rdn = bt(S,      T,      r - dr, sigma)
+        p_tdn = bt(S,      T - dt, r,      sigma) if T > dt else None
+
+        delta = (p_sup - p_sdn) / (2 * dS)
+        gamma = (p_sup - 2 * p0 + p_sdn) / dS**2
+        vega  = (p_vup - p_vdn) / (2 * dsig) / 100
+        rho   = (p_rup - p_rdn) / (2 * dr)   / 100
+        theta = (p_tdn - p0) / dt / 365 if p_tdn is not None else 0.0
+
+        return {
+            "delta": float(delta),
+            "gamma": float(gamma),
+            "theta": float(theta),
+            "vega":  float(vega),
+            "rho":   float(rho),
+        }
 
     # Calculate Black-Scholes d1 and d2 parameters
     # d1 = [ln(S/K) + (r + σ²/2)T] / (σ√T)
