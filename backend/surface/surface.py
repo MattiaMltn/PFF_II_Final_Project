@@ -11,24 +11,34 @@ from backend.data.database import get_connection
 
 
 def get_vol_surface_history(ticker: str, option_type: str) -> dict:
-    """
-    Read closing_snapshot and return the historical implied vol surface.
+    """Return the full historical implied-volatility surface for a ticker.
 
-    Parameters
-    ----------
-    ticker : str
-        Ticker symbol (e.g. 'AAPL'). Case-insensitive.
-    option_type : str
-        'call' or 'put'.
+    Queries every row in ``closing_snapshot`` for the given ticker and
+    option type, then packages the results for downstream 3-D visualisation.
 
-    Returns
-    -------
-    dict with keys:
-        - 'dates': sorted list of snapshot dates as strings (YYYY-MM-DD)
-        - 'surfaces': list of dicts, one per row, each with keys
-            'snapshot_date', 'expiration', 'strike', 'implied_vol'
+    Args:
+        ticker (str): Equity ticker symbol, e.g. ``'AAPL'``.
+            Case-insensitive — converted to upper-case internally.
+        option_type (str): Option flavour, either ``'call'`` or ``'put'``.
 
-    Returns {'dates': [], 'surfaces': []} if no data is available.
+    Returns:
+        dict: A dictionary with two keys:
+
+        - ``'dates'`` (list[str]): Sorted, deduplicated list of snapshot
+          dates in ``YYYY-MM-DD`` format.
+        - ``'surfaces'`` (list[dict]): One dictionary per data-point, each
+          containing ``'snapshot_date'``, ``'expiration'``, ``'strike'``
+          (float), and ``'implied_vol'`` (float).
+
+        Returns ``{'dates': [], 'surfaces': []}`` when no data is found.
+
+    Example:
+        >>> result = get_vol_surface_history('AAPL', 'call')
+        >>> result['dates'][:3]
+        ['2024-01-02', '2024-01-03', '2024-01-04']
+        >>> result['surfaces'][0]
+        {'snapshot_date': '2024-01-02', 'expiration': '2024-02-16',
+         'strike': 150.0, 'implied_vol': 0.28}
     """
     with get_connection() as conn:
         cursor = conn.cursor()
@@ -62,28 +72,37 @@ def get_vol_surface_history(ticker: str, option_type: str) -> dict:
 
 
 def get_surface_by_date(ticker: str, option_type: str, date: str) -> dict:
-    """
-    Return implied vol surface data for a single snapshot date.
+    """Return the implied-volatility surface for one specific snapshot date.
 
-    Parameters
-    ----------
-    ticker : str
-        Ticker symbol (e.g. 'AAPL'). Case-insensitive.
-    option_type : str
-        'call' or 'put'.
-    date : str
-        Snapshot date in 'YYYY-MM-DD' format.
+    Fetches all (expiration, strike, implied_vol) rows for a single
+    closing-snapshot date and returns three parallel lists suitable for
+    scatter or surface plots.
 
-    Returns
-    -------
-    dict with keys:
-        - 'expiration': list of expiration dates as strings (YYYY-MM-DD)
-        - 'strike': list of strike prices (float)
-        - 'implied_vol': list of implied volatilities (float)
+    Args:
+        ticker (str): Equity ticker symbol, e.g. ``'AAPL'``.
+            Case-insensitive — converted to upper-case internally.
+        option_type (str): Option flavour, either ``'call'`` or ``'put'``.
+        date (str): The snapshot date to query, in ``YYYY-MM-DD`` format.
 
-    All three lists are parallel (same length, same ordering).
-    Returns {'expiration': [], 'strike': [], 'implied_vol': []} if no data
-    is found for the given ticker, option_type, and date.
+    Returns:
+        dict: A dictionary with three parallel lists (all the same length,
+        in (expiration, strike) order):
+
+        - ``'expiration'`` (list[str]): Expiration dates in ``YYYY-MM-DD``
+          format.
+        - ``'strike'`` (list[float]): Strike prices in ascending order.
+        - ``'implied_vol'`` (list[float]): Corresponding implied volatilities
+          as decimals (e.g. ``0.25`` represents 25 %).
+
+        Returns ``{'expiration': [], 'strike': [], 'implied_vol': []}`` when
+        no data is found for the given ticker, option type, and date.
+
+    Example:
+        >>> surface = get_surface_by_date('AAPL', 'put', '2024-03-15')
+        >>> len(surface['strike'])
+        42
+        >>> surface['expiration'][0], surface['strike'][0]
+        ('2024-04-19', 140.0)
     """
     with get_connection() as conn:
         cursor = conn.cursor()
@@ -109,27 +128,45 @@ def get_surface_by_date(ticker: str, option_type: str, date: str) -> dict:
 
 
 def build_surface_grid(ticker: str, option_type: str, snapshot_date: str) -> dict:
-    """
-    Build an interpolated 3D grid for a single snapshot date.
+    """Build a cubic-interpolated 30×30 volatility-surface grid for one date.
 
-    Parameters
-    ----------
-    ticker : str
-        Ticker symbol (e.g. 'AAPL'). Case-insensitive.
-    option_type : str
-        'call' or 'put'.
-    snapshot_date : str
-        Date string in YYYY-MM-DD format.
+    Retrieves raw (expiration, strike, implied_vol) data for the given
+    snapshot date, computes time-to-expiry in years, and uses
+    ``scipy.interpolate.griddata`` with cubic interpolation to produce
+    evenly-spaced 2-D meshgrids over the (strike, TTM) domain.
 
-    Returns
-    -------
-    dict with keys:
-        - 'K_grid': 2D array of strike values
-        - 'T_grid': 2D array of time-to-expiry values (in years)
-        - 'IV_mesh': 2D array of interpolated implied volatilities
-        - 'snapshot_date': the date string
+    Args:
+        ticker (str): Equity ticker symbol, e.g. ``'AAPL'``.
+            Case-insensitive — converted to upper-case internally.
+        option_type (str): Option flavour, either ``'call'`` or ``'put'``.
+        snapshot_date (str): The closing-snapshot date in ``YYYY-MM-DD``
+            format.  Used both as the DB filter and as the reference date
+            for computing time-to-expiry.
 
-    Returns None if no data is available for that date.
+    Returns:
+        dict | None: On success, a dictionary with four keys:
+
+        - ``'snapshot_date'`` (str): The input date, echoed back.
+        - ``'K_grid'`` (list[list[float]]): 30×30 grid of strike values
+          spanning ``[min_strike, max_strike]``.
+        - ``'T_grid'`` (list[list[float]]): 30×30 grid of time-to-expiry
+          values in fractional years, spanning ``[min_ttm, max_ttm]``.
+        - ``'IV_mesh'`` (list[list[float | None]]): 30×30 grid of
+          interpolated implied volatilities; cells outside the convex hull
+          of the raw data are ``NaN``.
+
+        Returns ``None`` if no data exists for the given inputs or if
+        fewer than 4 valid data-points are available (insufficient for
+        cubic interpolation).
+
+    Example:
+        >>> grid = build_surface_grid('AAPL', 'call', '2024-03-15')
+        >>> grid is not None
+        True
+        >>> len(grid['K_grid']), len(grid['K_grid'][0])
+        (30, 30)
+        >>> grid['snapshot_date']
+        '2024-03-15'
     """
     with get_connection() as conn:
         cursor = conn.cursor()
