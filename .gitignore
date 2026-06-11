@@ -1,7 +1,6 @@
 __pycache__/
 .pytest_cache/
 *.pyc
-.env
 options_data.db
 test_manual
 .env
