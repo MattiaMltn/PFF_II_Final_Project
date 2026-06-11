@@ -24,7 +24,10 @@ except ImportError:  # pragma: no cover - exercised only without dependency
     def load_dotenv() -> bool:
         return False
 
-from backend.llm.explainer import explain_pricing_result
+from backend.llm.explainer import (
+    explain_pricing_result,
+    explain_volatility_surface,
+)
 
 try:
     from backend.data.config import SUPPORTED_TICKERS
@@ -189,8 +192,8 @@ def _render_pricing_tab(
     st.divider()
     st.subheader("AI Explanation")
 
-    if not _has_gemini_key():
-        st.info("Add GEMINI_API_KEY to .env to enable the AI explanation.")
+    if not _has_groq_key():
+        st.info("Add GROQ_API_KEY to .env to enable the AI explanation.")
         return
 
     try:
@@ -211,7 +214,8 @@ def _render_pricing_tab(
                 price=price,
                 greeks=greeks,
             )
-        st.info(explanation)
+        with st.container(border=True):
+            st.markdown(_prepare_llm_markdown(explanation))
     except Exception as exc:
         st.warning(f"AI explanation unavailable: {exc}")
 
@@ -398,6 +402,15 @@ def _render_surface_tab(ticker: str, option_type: str) -> None:
         colorscale=colorscale,
     )
     st.plotly_chart(fig, width="stretch")
+    summary = _build_surface_summary(
+        df,
+        ticker=ticker,
+        option_type=option_type,
+        snapshot_date=selected_date,
+        source=history.get("source", "historical_db"),
+        smoothing_sigma=smoothing_sigma,
+    )
+    _render_surface_explanation(summary)
 
 
 def _render_surface_filter_captions(
@@ -456,6 +469,7 @@ def _render_temporal_surface(
     colorscale: str,
 ) -> None:
     frames = []
+    first_df = pd.DataFrame()
     latest_df = pd.DataFrame()
 
     for snapshot_date in selected_dates:
@@ -475,6 +489,8 @@ def _render_temporal_surface(
         pivot = _build_surface_pivot(df)
         display_pivot = _smooth_surface_pivot(pivot, smoothing_sigma)
         frames.append((snapshot_date, display_pivot, len(df)))
+        if first_df.empty:
+            first_df = df
         latest_df = df
 
     if len(frames) < 2:
@@ -493,6 +509,17 @@ def _render_temporal_surface(
         colorscale=colorscale,
     )
     st.plotly_chart(fig, width="stretch")
+    summary = _build_surface_summary(
+        latest_df,
+        ticker=ticker,
+        option_type=option_type,
+        snapshot_date=frames[-1][0],
+        source=history.get("source", "historical_db"),
+        smoothing_sigma=smoothing_sigma,
+        first_df=first_df,
+        first_snapshot=frames[0][0],
+    )
+    _render_surface_explanation(summary)
 
 
 def _surface_data_from_history(history: dict, snapshot_date: str) -> dict:
@@ -525,6 +552,91 @@ def _render_surface_stats(df: pd.DataFrame) -> None:
         f"{int(df['days_to_expiry'].min())} - "
         f"{int(df['days_to_expiry'].max())} days",
     )
+
+
+def _build_surface_summary(
+    df: pd.DataFrame,
+    ticker: str,
+    option_type: str,
+    snapshot_date: str,
+    source: str,
+    smoothing_sigma: float,
+    first_df: pd.DataFrame | None = None,
+    first_snapshot: str | None = None,
+) -> dict:
+    def median_for(mask: pd.Series) -> float | None:
+        values = df.loc[mask, "implied_vol"]
+        return float(values.median()) if not values.empty else None
+
+    atm_iv = median_for(df["moneyness"].between(0.95, 1.05))
+    summary = {
+        "ticker": ticker,
+        "option_type": option_type,
+        "snapshot_date": snapshot_date,
+        "source": source,
+        "points": len(df),
+        "maturities": int(df["days_to_expiry"].nunique()),
+        "moneyness_min": float(df["moneyness"].min()),
+        "moneyness_max": float(df["moneyness"].max()),
+        "dte_min": int(df["days_to_expiry"].min()),
+        "dte_max": int(df["days_to_expiry"].max()),
+        "iv_min": float(df["implied_vol"].min()),
+        "iv_max": float(df["implied_vol"].max()),
+        "iv_median": float(df["implied_vol"].median()),
+        "atm_iv": atm_iv,
+        "left_wing_iv": median_for(df["moneyness"] <= 0.90),
+        "right_wing_iv": median_for(df["moneyness"] >= 1.10),
+        "short_iv": median_for(df["days_to_expiry"] <= 60),
+        "long_iv": median_for(df["days_to_expiry"] >= 180),
+        "smoothing_sigma": smoothing_sigma,
+        "first_snapshot": first_snapshot,
+    }
+
+    if first_df is not None and not first_df.empty:
+        first_atm = first_df.loc[
+            first_df["moneyness"].between(0.95, 1.05),
+            "implied_vol",
+        ]
+        summary["median_iv_change"] = (
+            summary["iv_median"] - float(first_df["implied_vol"].median())
+        )
+        summary["atm_iv_change"] = (
+            atm_iv - float(first_atm.median())
+            if atm_iv is not None and not first_atm.empty
+            else 0.0
+        )
+
+    return summary
+
+
+def _render_surface_explanation(summary: dict) -> None:
+    st.subheader("AI Surface Commentary")
+    if not _has_groq_key():
+        st.info("Add GROQ_API_KEY to .env to enable the AI surface commentary.")
+        return
+
+    explanation_key = (
+        f"surface_explanation:{summary['ticker']}:{summary['option_type']}:"
+        f"{summary['snapshot_date']}:{summary.get('first_snapshot')}:"
+        f"{summary['points']}:{summary['iv_median']:.6f}:"
+        f"{summary['moneyness_min']:.3f}:{summary['moneyness_max']:.3f}:"
+        f"{summary['dte_min']}:{summary['dte_max']}:"
+        f"{summary['smoothing_sigma']}"
+    )
+
+    if st.button("Explain volatility surface", key=f"button:{explanation_key}"):
+        try:
+            with st.spinner("Interpreting volatility surface..."):
+                st.session_state[explanation_key] = explain_volatility_surface(
+                    summary
+                )
+        except Exception as exc:
+            st.warning(f"AI surface commentary unavailable: {exc}")
+
+    explanation = st.session_state.get(explanation_key)
+    if explanation:
+        with st.container(border=True):
+            st.markdown(_prepare_llm_markdown(explanation))
 
 
 def _smooth_surface_pivot(
@@ -1081,9 +1193,14 @@ def _norm_cdf(value: float) -> float:
     return 0.5 * (1 + erf(value / sqrt(2)))
 
 
-def _has_gemini_key() -> bool:
-    key = os.getenv("GEMINI_API_KEY", "").strip()
-    return bool(key and not key.startswith("PASTE_"))
+def _has_groq_key() -> bool:
+    key = os.getenv("GROQ_API_KEY", "").strip()
+    return key.startswith("gsk_")
+
+
+def _prepare_llm_markdown(explanation: str) -> str:
+    """Keep currency symbols from being interpreted as LaTeX by Streamlit."""
+    return explanation.replace("$", r"\$")
 
 
 if __name__ == "__main__":
