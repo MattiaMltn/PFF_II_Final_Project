@@ -189,8 +189,8 @@ def _render_pricing_tab(
     st.divider()
     st.subheader("AI Explanation")
 
-    if not _has_anthropic_key():
-        st.info("Add ANTHROPIC_API_KEY to .env to enable the AI explanation.")
+    if not _has_gemini_key():
+        st.info("Add GEMINI_API_KEY to .env to enable the AI explanation.")
         return
 
     try:
@@ -203,6 +203,8 @@ def _render_pricing_tab(
                     "T": inputs.T,
                     "r": inputs.r,
                     "sigma": inputs.sigma,
+                    "bid": inputs.bid,
+                    "ask": inputs.ask,
                     "option_type": option_type,
                     "american": american,
                 },
@@ -1079,9 +1081,9 @@ def _norm_cdf(value: float) -> float:
     return 0.5 * (1 + erf(value / sqrt(2)))
 
 
-def _has_anthropic_key() -> bool:
-    key = os.getenv("ANTHROPIC_API_KEY", "").strip()
-    return bool(key and not key.startswith("PASTE_") and key.startswith("sk-ant"))
+def _has_gemini_key() -> bool:
+    key = os.getenv("GEMINI_API_KEY", "").strip()
+    return bool(key and not key.startswith("PASTE_"))
 
 
 if __name__ == "__main__":
