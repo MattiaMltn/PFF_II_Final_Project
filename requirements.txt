@@ -18,7 +18,6 @@ streamlit>=1.28.0
 plotly>=5.17.0
 
 # LLM integration
-anthropic>=0.7.0
 python-dotenv>=1.0.0
 
 # Utilities
