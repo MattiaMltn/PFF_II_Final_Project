@@ -13,14 +13,17 @@ This platform allows the user to price options using the Binomial Tree CRR model
 
 
 ## Frontend
+
+```bash
 streamlit run frontend/app.py
+```
 
 ## Structure 
 ```
-backend/data/        → market data, SQLite database, public interface
+backend/data/        → market data, PostgreSQL database, public interface
 backend/pricing/     → Binomial Tree CRR, Greeks
 backend/surface/     → implied volatility surface
-backend/llm/         → LLM explainer via Claude API
+backend/llm/         → LLM explainer via Groq API
 frontend/app.py      → Streamlit dashboard
 tests/               → unit tests
 docs/                → LaTeX documentation
@@ -32,13 +35,17 @@ docs/                → LaTeX documentation
 git clone https://github.com/<org>/PFF_II_Final_Project.git
 cd PFF_II_Final_Project
 pip install -r requirements.txt
-cp .env.example .env   # add ANTHROPIC_API_KEY and FACTSET_API_KEY
+cp .env.example .env   # add database credentials and GROQ_API_KEY
 ```
+
+Ask the database owner for the shared Supabase credentials. Each collaborator
+should create their own Groq API key and keep it only in their local `.env`.
  
 ## Usage
  
 ```bash
 streamlit run frontend/app.py
+```
 
 ## Module Specifications
  
@@ -50,8 +57,8 @@ through this module.
  
 When the user selects a ticker, an option type (call/put) and a style
 (European/American), the system synchronizes with the market data source —
-either Yahoo Finance via `yfinance` or FactSet via API — and updates the local
-SQLite database with all available strikes (K) and expirations (T).
+either Yahoo Finance via `yfinance` or FactSet via API — and updates the
+PostgreSQL database with all available strikes (K) and expirations (T).
 These populate the dropdown menus in the dashboard.
  
 Once the user selects a specific strike and expiration, the module extracts four
@@ -200,4 +207,3 @@ grid    = build_surface_grid("AAPL", "call", "2026-05-07")
 ### LLM Explainer — `backend/llm/`
  
 *To be completed by [Name]*
-
